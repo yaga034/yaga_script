@@ -1,0 +1,87 @@
+#! C:/Program Files/Nuke13.2v1/nuke-13.2.1.dll -nx
+version 13.2 v1
+Gizmo {
+ inputs 2
+ tile_color 0x2bff00ff
+ addUserKnob {20 Saturation}
+ addUserKnob {41 white l Highlight T Grade1.white}
+ addUserKnob {41 gamma l Midtone T Grade1.gamma}
+ addUserKnob {41 black l Shadow T Grade1.black}
+ addUserKnob {41 add l Offset T Grade1.add}
+ addUserKnob {41 mix T Grade1.mix}
+ addUserKnob {20 Switch l Choose_ColorSpace}
+ addUserKnob {41 which T Switch1.which}
+ addUserKnob {26 note l Discription T "0 : HSV\n1 : HSL"}
+}
+ Input {
+  inputs 0
+  name Mask
+  xpos -936
+  ypos 167
+  number 1
+ }
+set N71447c00 [stack 0]
+ Input {
+  inputs 0
+  name In
+  xpos -541
+  ypos -11
+ }
+set N71725400 [stack 0]
+ Colorspace {
+  colorspace_out HSL
+  name Colorspace1
+  xpos -463
+  ypos 181
+ }
+ Grade {
+  inputs 1+1
+  channels {-rgba.red rgba.green -rgba.blue none}
+  black {{parent.Grade1.black}}
+  white {{parent.Grade1.white}}
+  add {{parent.Grade1.add}}
+  gamma {{parent.Grade1.gamma}}
+  mix {{parent.Grade1.mix}}
+  name Grade2
+  xpos -463
+  ypos 240
+ }
+ Colorspace {
+  colorspace_in HSL
+  name Colorspace2
+  xpos -463
+  ypos 300
+ }
+push $N71447c00
+push $N71725400
+ Colorspace {
+  colorspace_out HSV
+  name Colorspace3
+  xpos -626
+  ypos 187
+ }
+ Grade {
+  inputs 1+1
+  channels {-rgba.red rgba.green -rgba.blue none}
+  name Grade1
+  xpos -626
+  ypos 240
+ }
+ Colorspace {
+  colorspace_in HSV
+  name Colorspace4
+  xpos -626
+  ypos 303
+ }
+ Switch {
+  inputs 2
+  name Switch1
+  xpos -544
+  ypos 456
+ }
+ Output {
+  name Output1
+  xpos -544
+  ypos 590
+ }
+end_group
