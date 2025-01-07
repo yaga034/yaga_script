@@ -104,6 +104,7 @@ function EffectController(thisObj) {
     var resetAllBtn = win.add("button", undefined, "Reset All");
 
     // ユーティリティ関数
+
     function clampValue(value, min, max) {
         return Math.min(Math.max(value, min), max);
     }
@@ -114,6 +115,19 @@ function EffectController(thisObj) {
             return null;
         }
         return comp;
+    }
+
+    function getLayerByName(comp, layerName) {  //レイヤーを名前で検索できるように
+        for (var i = 1; i <= comp.numLayers; i++) {
+            if (comp.layer(i).name === layerName) {
+                return comp.layer(i);
+            }
+        }
+        return null;
+    }
+
+    function getLayerNameFromDropdownText(text) {  // ドロップダウンのテキストから名前を抽出 (例: "1: LayerName" → "LayerName")
+        return text.split(": ")[1];
     }
 
     function getSliderPropertyName() {
@@ -178,20 +192,20 @@ function EffectController(thisObj) {
         var comp = app.project.activeItem;
         layerDropdown.removeAll();
 
-        for (var id in activeLayerSettings) {
-            try {
-                comp.layer(parseInt(id));
-            } catch (err) {
-                delete activeLayerSettings[id];
+        // 存在しないレイヤーの設定を削除
+        for (var layerName in activeLayerSettings) {
+            if (!getLayerByName(comp, layerName)) {
+                delete activeLayerSettings[layerName];
             }
         }
 
+        // アクティブなレイヤーをリストに追加
         for (var i = 1; i <= comp.numLayers; i++) {
             var layer = comp.layer(i);
-            if (activeLayerSettings[i] || isLayerActive(layer)) {
+            if (activeLayerSettings[layer.name] || isLayerActive(layer)) {
                 layerDropdown.add("item", i + ": " + layer.name);
-                if (!activeLayerSettings[i]) {
-                    activeLayerSettings[i] = {
+                if (!activeLayerSettings[layer.name]) {
+                    activeLayerSettings[layer.name] = {
                         amplitude: defaultValues.amplitude,
                         frequency: defaultValues.frequency,
                         blend: defaultValues.blend,
@@ -203,7 +217,8 @@ function EffectController(thisObj) {
 
         if (layerDropdown.items.length > 0) {
             layerDropdown.selection = 0;
-            loadLayerSettings(parseInt(layerDropdown.selection.text));
+            var layerName = getLayerNameFromDropdownText(layerDropdown.selection.text);
+            loadLayerSettings(layerName);
         }
 
         updateMotionBlurState();
@@ -212,12 +227,12 @@ function EffectController(thisObj) {
     function updateMotionBlurState() {
         if (!layerDropdown.selection) return;
         
-        var layerIndex = parseInt(layerDropdown.selection.text);
+        var layerName = getLayerNameFromDropdownText(layerDropdown.selection.text);
         var comp = app.project.activeItem;
         if (!comp) return;
         
         try {
-            var layer = comp.layer(layerIndex);
+            var layer = getLayerByName(comp, layerName);
             if (layer && layer.motionBlur !== undefined) {
                 blurCheckbox.value = layer.motionBlur;
             }
@@ -304,7 +319,6 @@ function EffectController(thisObj) {
             for (var i = 0; i < selectedLayers.length; i++) {
                 var layer = selectedLayers[i];
                 
-                // 既存のエフェクトを確認し、必要な場合のみ追加
                 var effects = layer.property("ADBE Effect Parade");
                 
                 if (!effects.property("Amplitude")) {
@@ -329,7 +343,7 @@ function EffectController(thisObj) {
                 var positionProp = layer.property("ADBE Transform Group").property("ADBE Position");
                 positionProp.expression = generateWiggleExpression();
     
-                activeLayerSettings[layer.index] = {
+                activeLayerSettings[layer.name] = {
                     amplitude: defaultValues.amplitude,
                     frequency: defaultValues.frequency,
                     blend: defaultValues.blend,
@@ -352,9 +366,9 @@ function EffectController(thisObj) {
         app.beginUndoGroup("Remove Layer from Camera Shake");
     
         try {
-            var layerIndex = parseInt(layerDropdown.selection.text);
+            var layerName = getLayerNameFromDropdownText(layerDropdown.selection.text);
             var comp = app.project.activeItem;
-            var layer = comp.layer(layerIndex);
+            var layer = getLayerByName(comp, layerName);
     
             if (layer) {
                 var effects = layer.Effects;
@@ -375,7 +389,7 @@ function EffectController(thisObj) {
                     positionProp.expression = "";
                 }
                 
-                delete activeLayerSettings[layerIndex];
+                delete activeLayerSettings[layerName];
             }
     
         } catch (err) {
@@ -386,10 +400,10 @@ function EffectController(thisObj) {
         updateActiveLayerList();
     }
 
-    function saveLayerSettings(layerId) {
-        if (!layerId || !activeLayerSettings[layerId]) return;
+    function saveLayerSettings(layerName) {
+        if (!layerName || typeof layerName !== 'string') return;
         
-        activeLayerSettings[layerId] = {
+        activeLayerSettings[layerName] = {
             amplitude: ampSlider.value,
             frequency: freqSlider.value,
             blend: blendSlider.value,
@@ -397,13 +411,13 @@ function EffectController(thisObj) {
         };
     }
 
-    function loadLayerSettings(layerId) {
-        if (!layerId || !activeLayerSettings[layerId]) {
+    function loadLayerSettings(layerName) {
+        if (!layerName || !activeLayerSettings[layerName]) {
             resetControls("all");
             return;
         }
-
-        var settings = activeLayerSettings[layerId];
+    
+        var settings = activeLayerSettings[layerName];
         ampSlider.value = settings.amplitude;
         ampText.text = settings.amplitude.toString();
         freqSlider.value = settings.frequency;
@@ -430,21 +444,21 @@ function EffectController(thisObj) {
                 return;
             }
     
-            var layerIndex = parseInt(layerDropdown.selection.text);
-            var layer = comp.layer(layerIndex);
+            var layerName = getLayerNameFromDropdownText(layerDropdown.selection.text);
+            var layer = getLayerByName(comp, layerName);
             
             if (!layer) {
                 if (isNewEffect) alert("Layer not found");
                 return;
             }
     
-            saveLayerSettings(layerIndex);
+            saveLayerSettings(layerName);
     
             if (layer.motionBlur !== undefined) {
                 layer.motionBlur = blurCheckbox.value;
             }
     
-            // エフェクトの値だけを更新
+            // エフェクトの値を更新
             var effects = layer.property("ADBE Effect Parade");
             if (effects.property("Amplitude")) effects.property("Amplitude")(1).setValue(ampSlider.value);
             if (effects.property("Frequency")) effects.property("Frequency")(1).setValue(freqSlider.value);
@@ -462,8 +476,8 @@ function EffectController(thisObj) {
         function resetControls(controlType) {
             if (!layerDropdown.selection) return;
             
-            var layerIndex = parseInt(layerDropdown.selection.text);
-            var layer = app.project.activeItem.layer(layerIndex);
+            var layerName = getLayerNameFromDropdownText(layerDropdown.selection.text);
+            var layer = getLayerByName(app.project.activeItem, layerName);
             
             function removeKeyframes(effectName) {
                 var effect = layer.property("ADBE Effect Parade").property(effectName);
@@ -533,8 +547,8 @@ function EffectController(thisObj) {
         // Layer selection change listener
         layerDropdown.onChange = function() {
             if (layerDropdown.selection) {
-                var layerIndex = parseInt(layerDropdown.selection.text);
-                loadLayerSettings(layerIndex);
+                var layerName = getLayerNameFromDropdownText(layerDropdown.selection.text);
+                loadLayerSettings(layerName);
                 updateMotionBlurState();
             }
         };
@@ -552,8 +566,8 @@ function EffectController(thisObj) {
         // Keyframe button listeners
         ampKeyBtn.onClick = function() {
             if (layerDropdown.selection) {
-                var layerIndex = parseInt(layerDropdown.selection.text);
-                var layer = app.project.activeItem.layer(layerIndex);
+                var layerName = getLayerNameFromDropdownText(layerDropdown.selection.text);
+                var layer = getLayerByName(app.project.activeItem, layerName);
                 var prop = getOrCreateEffectSlider(layer, "Amplitude", ampSlider.value);
                 setKeyframeAtCurrentTime(prop, ampSlider.value);
             }
@@ -561,8 +575,8 @@ function EffectController(thisObj) {
         
         freqKeyBtn.onClick = function() {
             if (layerDropdown.selection) {
-                var layerIndex = parseInt(layerDropdown.selection.text);
-                var layer = app.project.activeItem.layer(layerIndex);
+                var layerName = getLayerNameFromDropdownText(layerDropdown.selection.text);
+                var layer = getLayerByName(app.project.activeItem, layerName);
                 var prop = getOrCreateEffectSlider(layer, "Frequency", freqSlider.value);
                 setKeyframeAtCurrentTime(prop, freqSlider.value);
             }
@@ -570,8 +584,8 @@ function EffectController(thisObj) {
         
         blendKeyBtn.onClick = function() {
             if (layerDropdown.selection) {
-                var layerIndex = parseInt(layerDropdown.selection.text);
-                var layer = app.project.activeItem.layer(layerIndex);
+                var layerName = getLayerNameFromDropdownText(layerDropdown.selection.text);
+                var layer = getLayerByName(app.project.activeItem, layerName);
                 var prop = getOrCreateEffectSlider(layer, "Blend", blendSlider.value);
                 setKeyframeAtCurrentTime(prop, blendSlider.value);
             }
